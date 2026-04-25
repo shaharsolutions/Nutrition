@@ -26,8 +26,7 @@ const stats = {
     morning: document.getElementById('stat-breakfast'),
     afternoon: document.getElementById('stat-lunch'),
     evening: document.getElementById('stat-dinner'),
-    snacks: document.getElementById('stat-snacks'),
-    total: document.getElementById('stat-total')
+    snacks: document.getElementById('stat-snacks')
 };
 
 const defaultImages = {
@@ -122,17 +121,22 @@ mealForm.addEventListener('submit', async (e) => {
 });
 
 // Sync checkbox with select
-document.getElementById('meal-time').addEventListener('change', (e) => {
-    const saveToRepoContainer = document.getElementById('save-to-repo').parentElement;
-    if (e.target.value === 'repository') {
-        saveToRepoContainer.style.opacity = '0.5';
-        saveToRepoContainer.style.pointerEvents = 'none';
+const mealTimeSelect = document.getElementById('meal-time');
+const saveToRepoContainer = document.getElementById('save-to-repo').parentElement;
+
+function updateRepoCheckboxVisibility() {
+    if (mealTimeSelect.value === 'repository') {
+        saveToRepoContainer.style.display = 'none';
         document.getElementById('save-to-repo').checked = false;
     } else {
-        saveToRepoContainer.style.opacity = '1';
-        saveToRepoContainer.style.pointerEvents = 'all';
+        saveToRepoContainer.style.display = 'flex';
     }
-});
+}
+
+mealTimeSelect.addEventListener('change', updateRepoCheckboxVisibility);
+
+// Set initial state
+updateRepoCheckboxVisibility();
 
 window.toggleEaten = async function(id) {
     const meal = meals.find(m => m.id === id);
@@ -167,6 +171,56 @@ window.deleteMeal = async function(id) {
     }
 };
 
+window.quickAddMeal = function(mealId) {
+    const meal = meals.find(m => m.id === mealId);
+    if (!meal) return;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'quick-add-overlay';
+    
+    overlay.innerHTML = `
+        <div class="quick-add-modal animate-up">
+            <h3>הוסף ליומן</h3>
+            <p>לאיזו ארוחה להוסיף את "${meal.name}"?</p>
+            <div class="quick-add-options">
+                <button onclick="confirmQuickAdd('${mealId}', 'morning')">בוקר</button>
+                <button onclick="confirmQuickAdd('${mealId}', 'afternoon')">צהריים</button>
+                <button onclick="confirmQuickAdd('${mealId}', 'evening')">ערב</button>
+                <button onclick="confirmQuickAdd('${mealId}', 'snacks')">נשנושים</button>
+            </div>
+            <button class="quick-add-close" onclick="this.closest('.quick-add-overlay').remove()">ביטול</button>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+};
+
+window.confirmQuickAdd = async function(mealId, targetTime) {
+    const overlay = document.querySelector('.quick-add-overlay');
+    if (overlay) overlay.remove();
+
+    const templateMeal = meals.find(m => m.id === mealId);
+    if (!templateMeal) return;
+
+    const newMeal = {
+        name: templateMeal.name,
+        image: templateMeal.image,
+        time: targetTime,
+        date: new Date().toLocaleDateString(),
+        eaten: true,
+        createdAt: Date.now()
+    };
+
+    try {
+        const docRef = await addDoc(mealsCollection, newMeal);
+        meals.unshift({ id: docRef.id, ...newMeal });
+        renderAll();
+    } catch (error) {
+        console.error("Error adding document:", error);
+        alert('שגיאה בהוספת המנה');
+    }
+};
+
 function updateStats() {
     // Current day meals
     const today = new Date().toLocaleDateString();
@@ -181,11 +235,7 @@ function updateStats() {
 
     // Update UI
     Object.keys(counts).forEach(key => {
-        if (key === 'snacks') {
-            stats[key].textContent = `${counts[key]}`;
-        } else {
-            stats[key].textContent = `${counts[key]}/1`;
-        }
+        stats[key].textContent = `${counts[key]}`;
         
         if (counts[key] >= 1) {
             stats[key].classList.add('active');
@@ -193,43 +243,6 @@ function updateStats() {
             stats[key].classList.remove('active');
         }
     });
-
-    const targetGoals = ['morning', 'afternoon', 'evening'];
-    const totalGoalsMet = targetGoals.filter(k => counts[k] >= 1).length;
-    const percentage = Math.round((totalGoalsMet / 3) * 100);
-    stats.total.textContent = `${percentage}%`;
-
-    // Motivational Message
-    let message = '';
-    if (percentage === 0) message = 'התחלה חדשה! בואו נתחיל לתעד.';
-    else if (percentage < 40) message = 'צעד ראשון מעולה, המשיכו כך!';
-    else if (percentage < 70) message = 'כמעט שם! עוד קצת והיעד היומי הושג.';
-    else if (percentage < 100) message = 'רק עוד ארוחה אחת לסיום מושלם!';
-    else message = 'כל הכבוד! הגעתם ליעד היומי שלכם! 🎉';
-
-    document.querySelector('.subtitle').textContent = message;
-
-    // Streak Logic (Keep using localStorage for simple streak tracking)
-    if (percentage === 100) {
-        let streak = parseInt(localStorage.getItem('nutriflow_streak')) || 0;
-        const lastGoalDate = localStorage.getItem('nutriflow_last_goal');
-        const yest = new Date();
-        yest.setDate(yest.getDate() - 1);
-        
-        if (lastGoalDate !== today) {
-            if (lastGoalDate === yest.toLocaleDateString()) {
-                streak++;
-            } else {
-                streak = 1;
-            }
-            localStorage.setItem('nutriflow_streak', streak);
-            localStorage.setItem('nutriflow_last_goal', today);
-        }
-        
-        if (streak > 0) {
-            document.querySelector('.subtitle').innerHTML += `<br><span style="color: var(--accent-secondary); font-weight: 800;">🔥 רצף של ${streak} ימים!</span>`;
-        }
-    }
 }
 
 function renderRepository() {
@@ -237,20 +250,20 @@ function renderRepository() {
     const repoMeals = meals.filter(m => m.time === 'repository');
 
     if (repoMeals.length === 0) {
-        repositoryList.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 1.5rem; color: var(--text-muted); font-size: 0.9rem;">
+        repositoryList.innerHTML = `<div style="flex: 1 1 100%; text-align: center; padding: 2rem; color: var(--text-muted); font-size: 1rem;">
             המאגר ריק. הוסיפו מנות שתרצו לשמור להמשך!
         </div>`;
         return;
     }
 
     const hint = document.createElement('div');
-    hint.style.gridColumn = '1/-1';
+    hint.style.flex = '1 1 100%';
     hint.style.textAlign = 'center';
-    hint.style.fontSize = '0.85rem';
-    hint.style.color = 'var(--accent-primary)';
+    hint.style.fontSize = '0.9rem';
+    hint.style.color = 'var(--text-muted)';
     hint.style.marginBottom = '1rem';
-    hint.style.fontWeight = '600';
-    hint.innerHTML = '💡 גררו מנה אל אחד העיגולים למעלה (בוקר/צהריים/ערב/נשנושים) כדי לסמן אותה כבוצעה';
+    hint.style.padding = '0 1rem';
+    hint.innerHTML = '💡 <b>טיפ:</b> גררו מנה אל אחד העיגולים (בוקר/צהריים/ערב/נשנושים) למעלה כדי לסמן אותה כבוצעה.';
     repositoryList.appendChild(hint);
 
     repoMeals.forEach(meal => {
@@ -261,7 +274,8 @@ function renderRepository() {
 
         card.innerHTML = `
             <div class="card-actions">
-                <button class="meal-delete" onclick="deleteMeal('${meal.id}')">×</button>
+                <button class="meal-delete" onclick="deleteMeal('${meal.id}')" title="מחק מהמאגר">×</button>
+                <button class="meal-check active" style="font-size: 1.5rem; width: 36px; padding: 0; background: var(--accent-primary); border-color: var(--accent-primary);" onclick="quickAddMeal('${meal.id}')" title="הוסף ליומן">+</button>
             </div>
             <img src="${meal.image}" alt="${meal.name}" class="meal-image" onerror="this.src='https://via.placeholder.com/200x100?text=Image+Not+Found'">
             <div class="meal-content" style="padding: 0.5rem 0;">
@@ -388,27 +402,49 @@ function initDragAndDrop() {
             const meal = meals.find(m => m.id === mealId);
             
             if (meal) {
-                const prevTime = meal.time;
-                const prevDate = meal.date;
-                const prevEaten = meal.eaten;
+                if (meal.time === 'repository') {
+                    // Create a copy of the meal for the daily log
+                    const newMeal = {
+                        name: meal.name,
+                        image: meal.image,
+                        time: target.time,
+                        date: new Date().toLocaleDateString(),
+                        eaten: true,
+                        createdAt: Date.now()
+                    };
 
-                meal.time = target.time;
-                meal.date = new Date().toLocaleDateString();
-                meal.eaten = true;
-                renderAll(); // Optimistic update
+                    try {
+                        const docRef = await addDoc(mealsCollection, newMeal);
+                        meals.unshift({ id: docRef.id, ...newMeal });
+                        renderAll();
+                    } catch (error) {
+                        console.error("Error adding document:", error);
+                        alert('שגיאה בשמירת המנה');
+                    }
+                } else {
+                    // Moving an existing daily meal
+                    const prevTime = meal.time;
+                    const prevDate = meal.date;
+                    const prevEaten = meal.eaten;
 
-                try {
-                    await updateDoc(doc(db, "meals", mealId), {
-                        time: meal.time,
-                        date: meal.date,
-                        eaten: meal.eaten
-                    });
-                } catch (error) {
-                    console.error("Error updating document:", error);
-                    meal.time = prevTime;
-                    meal.date = prevDate;
-                    meal.eaten = prevEaten;
-                    renderAll(); // Revert
+                    meal.time = target.time;
+                    meal.date = new Date().toLocaleDateString();
+                    meal.eaten = true;
+                    renderAll(); // Optimistic update
+
+                    try {
+                        await updateDoc(doc(db, "meals", mealId), {
+                            time: meal.time,
+                            date: meal.date,
+                            eaten: meal.eaten
+                        });
+                    } catch (error) {
+                        console.error("Error updating document:", error);
+                        meal.time = prevTime;
+                        meal.date = prevDate;
+                        meal.eaten = prevEaten;
+                        renderAll(); // Revert
+                    }
                 }
             }
         });
