@@ -1,5 +1,22 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyA0a_ZOzAiILPpUhcmbOQOtC01bN4459Jo",
+    authDomain: "myplate-588bb.firebaseapp.com",
+    projectId: "myplate-588bb",
+    storageBucket: "myplate-588bb.firebasestorage.app",
+    messagingSenderId: "217219694595",
+    appId: "1:217219694595:web:06cdee68ff4795d765ce36",
+    measurementId: "G-7QFMPG0D2P"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const mealsCollection = collection(db, "meals");
+
 // State Management
-let meals = JSON.parse(localStorage.getItem('nutriflow_meals')) || [];
+let meals = [];
 
 // DOM Elements
 const mealForm = document.getElementById('meal-form');
@@ -30,8 +47,24 @@ const timeLabels = {
 };
 
 // Initialize
-initDragAndDrop();
-renderAll();
+async function initApp() {
+    initDragAndDrop();
+    await fetchMeals();
+}
+
+async function fetchMeals() {
+    try {
+        const querySnapshot = await getDocs(mealsCollection);
+        meals = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // Sort meals by createdAt descending so newest is first
+        meals.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        renderAll();
+    } catch (error) {
+        console.error("Error fetching meals:", error);
+    }
+}
+
+initApp();
 
 function renderAll() {
     renderMeals();
@@ -40,38 +73,52 @@ function renderAll() {
 }
 
 // Form Submission
-mealForm.addEventListener('submit', (e) => {
+mealForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
+    const btn = mealForm.querySelector('.btn-add');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span>שומר...</span>';
+    btn.disabled = true;
+
     const name = document.getElementById('meal-name').value;
     const time = document.getElementById('meal-time').value;
     const image = document.getElementById('meal-image').value || defaultImages[time];
     const saveToRepo = document.getElementById('save-to-repo').checked;
 
-    // 1. Add the meal to the selected time/date
     const newMeal = {
-        id: Date.now(),
         name,
         time,
         image,
         date: new Date().toLocaleDateString(),
-        eaten: time !== 'repository'
+        eaten: time !== 'repository',
+        createdAt: Date.now()
     };
-    meals.unshift(newMeal);
 
-    // 2. If it's a specific time AND user wants to save to repo, create a duplicate for the repo
-    if (time !== 'repository' && saveToRepo) {
-        const repoItem = {
-            ...newMeal,
-            id: Date.now() + 1, // Ensure unique ID
-            time: 'repository',
-            eaten: false
-        };
-        meals.push(repoItem);
+    try {
+        const docRef = await addDoc(mealsCollection, newMeal);
+        meals.unshift({ id: docRef.id, ...newMeal });
+
+        if (time !== 'repository' && saveToRepo) {
+            const repoItem = {
+                ...newMeal,
+                time: 'repository',
+                eaten: false,
+                createdAt: Date.now() + 1
+            };
+            const repoRef = await addDoc(mealsCollection, repoItem);
+            meals.push({ id: repoRef.id, ...repoItem });
+        }
+
+        renderAll();
+        mealForm.reset();
+    } catch (error) {
+        console.error("Error adding document:", error);
+        alert('שגיאה בשמירת המנה');
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
     }
-
-    saveAndRefresh();
-    mealForm.reset();
 });
 
 // Sync checkbox with select
@@ -87,23 +134,38 @@ document.getElementById('meal-time').addEventListener('change', (e) => {
     }
 });
 
-function toggleEaten(id) {
+window.toggleEaten = async function(id) {
     const meal = meals.find(m => m.id === id);
     if (meal) {
         meal.eaten = !meal.eaten;
-        saveAndRefresh();
+        renderAll(); // Optimistic update
+        
+        try {
+            await updateDoc(doc(db, "meals", id), {
+                eaten: meal.eaten
+            });
+        } catch (error) {
+            console.error("Error updating document:", error);
+            meal.eaten = !meal.eaten; // Revert
+            renderAll();
+        }
     }
-}
+};
 
-function deleteMeal(id) {
+window.deleteMeal = async function(id) {
+    const previousMeals = [...meals];
     meals = meals.filter(m => m.id !== id);
-    saveAndRefresh();
-}
+    renderAll(); // Optimistic update
 
-function saveAndRefresh() {
-    localStorage.setItem('nutriflow_meals', JSON.stringify(meals));
-    renderAll();
-}
+    try {
+        await deleteDoc(doc(db, "meals", id));
+    } catch (error) {
+        console.error("Error deleting document:", error);
+        meals = previousMeals; // Revert
+        renderAll();
+        alert('שגיאה במחיקת המנה');
+    }
+};
 
 function updateStats() {
     // Current day meals
@@ -147,7 +209,7 @@ function updateStats() {
 
     document.querySelector('.subtitle').textContent = message;
 
-    // Streak Logic
+    // Streak Logic (Keep using localStorage for simple streak tracking)
     if (percentage === 100) {
         let streak = parseInt(localStorage.getItem('nutriflow_streak')) || 0;
         const lastGoalDate = localStorage.getItem('nutriflow_last_goal');
@@ -181,7 +243,6 @@ function renderRepository() {
         return;
     }
 
-    // Add a hint if repository has items
     const hint = document.createElement('div');
     hint.style.gridColumn = '1/-1';
     hint.style.textAlign = 'center';
@@ -200,7 +261,7 @@ function renderRepository() {
 
         card.innerHTML = `
             <div class="card-actions">
-                <button class="meal-delete" onclick="deleteMeal(${meal.id})">×</button>
+                <button class="meal-delete" onclick="deleteMeal('${meal.id}')">×</button>
             </div>
             <img src="${meal.image}" alt="${meal.name}" class="meal-image" onerror="this.src='https://via.placeholder.com/200x100?text=Image+Not+Found'">
             <div class="meal-content" style="padding: 0.5rem 0;">
@@ -232,7 +293,6 @@ function renderMeals() {
         return;
     }
 
-    // Group meals by date
     const groupedMeals = dailyMeals.reduce((groups, meal) => {
         const date = meal.date;
         if (!groups[date]) {
@@ -282,10 +342,10 @@ function renderMeals() {
 
             card.innerHTML = `
                 <div class="card-actions">
-                    <button class="meal-check ${meal.eaten ? 'active' : ''}" onclick="toggleEaten(${meal.id})" style="width: auto; padding: 0 10px; border-radius: 12px; font-size: 0.7rem;">
+                    <button class="meal-check ${meal.eaten ? 'active' : ''}" onclick="toggleEaten('${meal.id}')" style="width: auto; padding: 0 10px; border-radius: 12px; font-size: 0.7rem;">
                         ${meal.eaten ? '✓ בוצע' : 'סמן כבוצע'}
                     </button>
-                    <button class="meal-delete" onclick="deleteMeal(${meal.id})">×</button>
+                    <button class="meal-delete" onclick="deleteMeal('${meal.id}')">×</button>
                 </div>
                 <img src="${meal.image}" alt="${meal.name}" class="meal-image" onerror="this.src='https://via.placeholder.com/400x200?text=Image+Not+Found'">
                 <div class="meal-content">
@@ -320,20 +380,36 @@ function initDragAndDrop() {
             target.el.classList.remove('drag-over');
         });
 
-        target.el.addEventListener('drop', (e) => {
+        target.el.addEventListener('drop', async (e) => {
             e.preventDefault();
             target.el.classList.remove('drag-over');
             
-            const mealId = parseInt(e.dataTransfer.getData('text/plain'));
+            const mealId = e.dataTransfer.getData('text/plain');
             const meal = meals.find(m => m.id === mealId);
             
             if (meal) {
+                const prevTime = meal.time;
+                const prevDate = meal.date;
+                const prevEaten = meal.eaten;
+
                 meal.time = target.time;
                 meal.date = new Date().toLocaleDateString();
-                meal.eaten = true; // Mark as eaten when dropped into a daily slot? 
-                // Or maybe keep it false and let the user check it. 
-                // Given it's a "diary", dropping it usually means you ate it.
-                saveAndRefresh();
+                meal.eaten = true;
+                renderAll(); // Optimistic update
+
+                try {
+                    await updateDoc(doc(db, "meals", mealId), {
+                        time: meal.time,
+                        date: meal.date,
+                        eaten: meal.eaten
+                    });
+                } catch (error) {
+                    console.error("Error updating document:", error);
+                    meal.time = prevTime;
+                    meal.date = prevDate;
+                    meal.eaten = prevEaten;
+                    renderAll(); // Revert
+                }
             }
         });
     });
