@@ -26,15 +26,15 @@
         <section class="stats-grid animate-up" style="animation-delay: 0.1s;">
             <div class="glass-card stat-item">
                 <div class="stat-circle" id="stat-breakfast">0</div>
-                <div class="stat-label">ארוחת בוקר</div>
+                <div class="stat-label">עד 12:00</div>
             </div>
             <div class="glass-card stat-item">
                 <div class="stat-circle" id="stat-lunch">0</div>
-                <div class="stat-label">ארוחת צהריים</div>
+                <div class="stat-label">12:00-18:00</div>
             </div>
             <div class="glass-card stat-item">
                 <div class="stat-circle" id="stat-dinner">0</div>
-                <div class="stat-label">ארוחת ערב</div>
+                <div class="stat-label">אחרי 18:00</div>
             </div>
             <div class="glass-card stat-item">
                 <div class="stat-circle" id="stat-snacks">0</div>
@@ -47,7 +47,7 @@
             <form class="meal-form" id="meal-form">
                 <div class="input-group">
                     <label>שם המנה</label>
-                    <input type="text" id="meal-name" placeholder="למשל: סלט קינואה..." required dir="auto">
+                    <input type="text" id="meal-name" placeholder="למשל: סלט קינואה..." required dir="rtl">
                 </div>
                 <div class="input-group">
                     <label>קישור לתמונה</label>
@@ -57,9 +57,9 @@
                     <label>קטגוריה / זמן</label>
                     <select id="meal-time">
                         <option value="repository">שמור למאגר בלבד</option>
-                        <option value="morning">ארוחת בוקר</option>
-                        <option value="afternoon">ארוחת צהריים</option>
-                        <option value="evening">ארוחת ערב</option>
+                        <option value="morning">עד 12:00</option>
+                        <option value="afternoon">12:00-18:00</option>
+                        <option value="evening">אחרי 18:00</option>
                         <option value="snacks">נשנושים</option>
                     </select>
                 </div>

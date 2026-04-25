@@ -39,9 +39,9 @@ const defaultImages = {
 
 const timeLabels = {
     repository: 'מאגר',
-    morning: 'בוקר',
-    afternoon: 'צהריים',
-    evening: 'ערב',
+    morning: 'עד 12:00',
+    afternoon: '12:00-18:00',
+    evening: 'אחרי 18:00',
     snacks: 'נשנושים'
 };
 
@@ -179,13 +179,13 @@ window.quickAddMeal = function(mealId) {
     overlay.className = 'quick-add-overlay';
     
     overlay.innerHTML = `
-        <div class="quick-add-modal animate-up">
+        <div class="quick-add-modal">
             <h3>הוסף ליומן</h3>
             <p>לאיזו ארוחה להוסיף את "${meal.name}"?</p>
             <div class="quick-add-options">
-                <button onclick="confirmQuickAdd('${mealId}', 'morning')">בוקר</button>
-                <button onclick="confirmQuickAdd('${mealId}', 'afternoon')">צהריים</button>
-                <button onclick="confirmQuickAdd('${mealId}', 'evening')">ערב</button>
+                <button onclick="confirmQuickAdd('${mealId}', 'morning')">עד 12:00</button>
+                <button onclick="confirmQuickAdd('${mealId}', 'afternoon')">12:00-18:00</button>
+                <button onclick="confirmQuickAdd('${mealId}', 'evening')">אחרי 18:00</button>
                 <button onclick="confirmQuickAdd('${mealId}', 'snacks')">נשנושים</button>
             </div>
             <button class="quick-add-close" onclick="this.closest('.quick-add-overlay').remove()">ביטול</button>
@@ -263,7 +263,7 @@ function renderRepository() {
     hint.style.color = 'var(--text-muted)';
     hint.style.marginBottom = '1rem';
     hint.style.padding = '0 1rem';
-    hint.innerHTML = '💡 <b>טיפ:</b> גררו מנה אל אחד העיגולים (בוקר/צהריים/ערב/נשנושים) למעלה כדי לסמן אותה כבוצעה.';
+    hint.innerHTML = '💡 <b>טיפ:</b> גררו מנה אל אחד העיגולים (עד 12:00/12:00-18:00/אחרי 18:00/נשנושים) למעלה כדי לסמן אותה כבוצעה.';
     repositoryList.appendChild(hint);
 
     repoMeals.forEach(meal => {
@@ -301,9 +301,7 @@ function renderMeals() {
     const dailyMeals = meals.filter(m => m.time !== 'repository');
 
     if (dailyMeals.length === 0) {
-        mealList.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: var(--text-muted);">
-            אין מנות רשומות עדיין. גררו מנה מהמאגר כדי להתחיל!
-        </div>`;
+        mealList.innerHTML = '';
         return;
     }
 
