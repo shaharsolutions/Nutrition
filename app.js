@@ -37,6 +37,43 @@ const defaultImages = {
     snacks: 'https://images.unsplash.com/photo-1599490659223-e1539e7ad93c?auto=format&fit=crop&q=80&w=1000'
 };
 
+const foodImageKeywords = {
+    'סלט': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&q=80&w=1000',
+    'חביתה': 'https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&q=80&w=1000',
+    'ביצה': 'https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&q=80&w=1000',
+    'פנקייק': 'https://images.unsplash.com/photo-1528207776546-365bb710ee93?auto=format&fit=crop&q=80&w=1000',
+    'פיצה': 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&q=80&w=1000',
+    'פסטה': 'https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&q=80&w=1000',
+    'עוף': 'https://images.unsplash.com/photo-1604908176997-125f25cc6f3d?auto=format&fit=crop&q=80&w=1000',
+    'בשר': 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=1000',
+    'סטייק': 'https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&q=80&w=1000',
+    'דג': 'https://images.unsplash.com/photo-1467003909585-2f8a72700288?auto=format&fit=crop&q=80&w=1000',
+    'אורז': 'https://images.unsplash.com/photo-1516684732162-798a0062be99?auto=format&fit=crop&q=80&w=1000',
+    'מרק': 'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&q=80&w=1000',
+    'טוסט': 'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?auto=format&fit=crop&q=80&w=1000',
+    'שייק': 'https://images.unsplash.com/photo-1553530979-7ee523b10004?auto=format&fit=crop&q=80&w=1000',
+    'יוגורט': 'https://images.unsplash.com/photo-1488477126128-53249539400e?auto=format&fit=crop&q=80&w=1000',
+    'פרי': 'https://images.unsplash.com/photo-1490818387583-1baba5e638af?auto=format&fit=crop&q=80&w=1000',
+    'פירות': 'https://images.unsplash.com/photo-1490818387583-1baba5e638af?auto=format&fit=crop&q=80&w=1000',
+    'שוקולד': 'https://images.unsplash.com/photo-1511381939415-e44015466834?auto=format&fit=crop&q=80&w=1000',
+    'קפה': 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&q=80&w=1000',
+    'לחם': 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&q=80&w=1000',
+    'המבורגר': 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&q=80&w=1000'
+};
+
+function getDynamicImage(name, time) {
+    if (!name) return defaultImages[time];
+    
+    const lowerName = name.toLowerCase();
+    for (const [keyword, url] of Object.entries(foodImageKeywords)) {
+        if (lowerName.includes(keyword)) {
+            return url;
+        }
+    }
+    
+    return defaultImages[time];
+}
+
 const timeLabels = {
     repository: 'מאגר',
     morning: 'עד 12:00',
@@ -82,7 +119,7 @@ mealForm.addEventListener('submit', async (e) => {
 
     const name = document.getElementById('meal-name').value;
     const time = document.getElementById('meal-time').value;
-    const image = document.getElementById('meal-image').value || defaultImages[time];
+    const image = document.getElementById('meal-image').value || getDynamicImage(name, time);
     const saveToRepo = document.getElementById('save-to-repo').checked;
 
     const newMeal = {
@@ -256,15 +293,7 @@ function renderRepository() {
         return;
     }
 
-    const hint = document.createElement('div');
-    hint.style.flex = '1 1 100%';
-    hint.style.textAlign = 'center';
-    hint.style.fontSize = '0.9rem';
-    hint.style.color = 'var(--text-muted)';
-    hint.style.marginBottom = '1rem';
-    hint.style.padding = '0 1rem';
-    hint.innerHTML = '💡 <b>טיפ:</b> גררו מנה אל אחד העיגולים (עד 12:00/12:00-18:00/אחרי 18:00/נשנושים) למעלה כדי לסמן אותה כבוצעה.';
-    repositoryList.appendChild(hint);
+
 
     repoMeals.forEach(meal => {
         const card = document.createElement('div');
